@@ -9,6 +9,8 @@ type InteractionsImageMime =
   | 'image/heic'
   | 'image/heif'
 
+type VariationLevel = 0 | 1 | 2 | 3
+
 function getApiKey(): string | undefined {
   return process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
 }
@@ -36,6 +38,116 @@ function clampInt(n: unknown, min: number, max: number, fallback: number) {
   const parsed = typeof n === 'number' ? n : Number(n)
   if (!Number.isFinite(parsed)) return fallback
   return Math.min(max, Math.max(min, Math.trunc(parsed)))
+}
+
+function mulberry32(seed: number) {
+  let t = seed >>> 0
+  return () => {
+    t += 0x6d2b79f5
+    let x = Math.imul(t ^ (t >>> 15), 1 | t)
+    x ^= x + Math.imul(x ^ (x >>> 7), 61 | x)
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function pickOne<T>(rand: () => number, items: readonly T[]): T {
+  return items[Math.floor(rand() * items.length)]!
+}
+
+function buildVariationDirective(type: MockupType, variationSeed: number, level: VariationLevel) {
+  if (level === 0) return ''
+
+  const rand = mulberry32(variationSeed)
+
+  const cameraAngles = [
+    'front-facing',
+    'three-quarter angle',
+    'slight top-down angle',
+    'low angle looking slightly up',
+    'side angle with gentle perspective',
+  ] as const
+  const lenses = ['35mm', '50mm', '85mm'] as const
+  const depthOfField = [
+    'deep depth of field (most of the product sharp)',
+    'moderate depth of field (product sharp, background softly blurred)',
+    'shallow depth of field (hero area sharp, background bokeh)',
+  ] as const
+  const lighting = [
+    'soft window light from camera-left',
+    'soft window light from camera-right',
+    'overhead diffused softbox lighting',
+    'dramatic side light with controlled shadow',
+    'bright high-key studio light with gentle shadow',
+  ] as const
+  const backgrounds = {
+    'flat-lay': [
+      'warm neutral paper backdrop',
+      'cool light-gray studio surface',
+      'subtle concrete texture surface',
+      'linen fabric backdrop with very subtle texture',
+      'matte white tabletop with gentle falloff',
+    ],
+    'product-shot': [
+      'seamless light-gray background',
+      'seamless off-white background',
+      'gradient studio backdrop (subtle, not colorful)',
+      'premium dark charcoal studio background',
+    ],
+    detail: [
+      'clean neutral background (out of focus)',
+      'soft gradient background (very subtle)',
+      'dark neutral background (out of focus)',
+    ],
+    lifestyle: [
+      'modern indoor apartment setting',
+      'urban street setting',
+      'minimal café setting',
+      'studio corner with natural light',
+    ],
+  } as const
+
+  const stylingPropsByLevel =
+    level >= 3
+      ? ([
+          'add one subtle, realistic accessory nearby (e.g., sunglasses, watch, simple tote), but keep focus on the product',
+          'include a light shadow pattern (e.g., window blinds) on the scene, not on the design itself',
+          'use a slightly more editorial composition (asymmetric framing) while staying photorealistic',
+        ] as const)
+      : level >= 2
+        ? ([
+            'vary composition (centered vs rule-of-thirds) and crop (full vs slightly tighter)',
+            'vary the direction of light and shadow softness',
+            'vary background material while keeping it neutral and premium',
+          ] as const)
+        : ([
+            'vary composition slightly (do not repeat the same framing)',
+            'vary lighting direction subtly',
+          ] as const)
+
+  const common = [
+    'Variation directive (important): create a clearly distinct photo from other outputs.',
+    `Camera angle: ${pickOne(rand, cameraAngles)}.`,
+    `Lens: ${pickOne(rand, lenses)}.`,
+    `Depth of field: ${pickOne(rand, depthOfField)}.`,
+    `Lighting: ${pickOne(rand, lighting)}.`,
+    `Background/setting: ${pickOne(rand, backgrounds[type])}.`,
+    `Styling/composition: ${pickOne(rand, stylingPropsByLevel)}.`,
+    'Do NOT alter the product design, graphics, colors, or fit; only vary the photography choices above.',
+  ]
+
+  if (type === 'lifestyle') {
+    common.push(
+      'For lifestyle: vary the pose (standing/walking/sitting) and framing (waist-up/full-body) while keeping the garment design identical.'
+    )
+  }
+
+  if (type === 'detail') {
+    common.push(
+      'For detail: choose a different focal area (stitching, fabric texture, print edge, collar/hem) than a typical macro.'
+    )
+  }
+
+  return common.join(' ')
 }
 
 function asErrorMessage(e: unknown) {
@@ -188,15 +300,19 @@ export async function POST(req: Request) {
     )
   }
 
+  const variationLevel = clampInt((body as { variationLevel?: unknown }).variationLevel, 0, 3, 1) as VariationLevel
+  const variationSeed = clampInt((body as { variationSeed?: unknown }).variationSeed, 1, 2_147_483_647, Date.now())
+
   const ai = new GoogleGenAI({ apiKey })
 
   try {
     const maxAttempts = clampInt((body as { attempts?: unknown }).attempts, 1, 3, 2)
     const { baseRules, shotPrompt } = promptFor(type)
+    const variationDirective = buildVariationDirective(type, variationSeed, variationLevel)
 
     let lastErrorMessage = ''
     console.log(
-      `[mockups:${requestId}] start type=${type} attempts=${maxAttempts} inputMime=${inputMime}`
+      `[mockups:${requestId}] start type=${type} attempts=${maxAttempts} inputMime=${inputMime} variationLevel=${variationLevel}`
     )
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -211,6 +327,7 @@ export async function POST(req: Request) {
                 // Keep base rules separate so they're always prominent.
                 { type: 'text', text: baseRules },
                 { type: 'text', text: shotPrompt },
+                ...(variationDirective ? [{ type: 'text' as const, text: variationDirective }] : []),
                 ...(attempt === 1 || !lastErrorMessage
                   ? []
                   : [{ type: 'text' as const, text: retryNote(lastErrorMessage) }]),

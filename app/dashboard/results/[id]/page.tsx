@@ -65,6 +65,9 @@ export default function ResultsPage() {
               imageDataUrl: project.originalImage,
               type: nextType,
               attempts: 2,
+              // Generate-more should diversify scenes more aggressively than the initial set.
+              variationLevel: 3,
+              variationSeed: Date.now() + completed * 9973,
             }),
           })
 
