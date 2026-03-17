@@ -68,6 +68,9 @@ function promptFor(type: MockupType) {
   
     'The output must look like real product photography, not AI-generated artwork.',
     'Photorealistic, natural lighting, realistic textures.',
+
+    "Improve image quality compared to the input photo: correct white balance, increase clarity, improve sharpness, reduce noise, and enhance contrast and color vibrance while keeping the product's true colors accurate.",
+    'Avoid washed-out colors or muddy tones; produce a crisp, well-lit, high-end ecommerce photo look.',
   
     'No added logos, no text, no watermarks.',
   ].join(' ')

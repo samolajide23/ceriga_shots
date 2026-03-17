@@ -1,10 +1,17 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useProjects } from '@/hooks/use-projects'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export default function ResultsPage() {
   const params = useParams()
@@ -12,6 +19,7 @@ export default function ResultsPage() {
   const { getProject, updateProject } = useProjects()
   const project = getProject(projectId)
   const isRunningRef = useRef(false)
+  const [moreCount, setMoreCount] = useState<number>(4)
 
   const types = useMemo<Array<'flat-lay' | 'product-shot' | 'detail' | 'lifestyle'>>(
     () => ['flat-lay', 'product-shot', 'detail', 'lifestyle'],
@@ -223,10 +231,16 @@ export default function ResultsPage() {
                       className="rounded-lg overflow-hidden border border-border bg-secondary/50"
                     >
                       <div className="w-full aspect-square flex items-center justify-center">
-                        <p className="text-xs text-muted-foreground">Generating…</p>
+                        <p className="text-xs text-muted-foreground">
+                          {i === 0 ? 'Generating…' : 'Pending'}
+                        </p>
                       </div>
                       <p className="text-xs text-muted-foreground p-2 bg-card text-center">
-                        Pending
+                        {i === 0
+                          ? project.generation?.nextType
+                            ? `Generating ${project.generation.nextType.replace('-', ' ')}`
+                            : 'Generating'
+                          : 'Pending'}
                       </p>
                     </div>
                   )
@@ -239,6 +253,54 @@ export default function ResultsPage() {
       <div className="flex gap-4">
         <Button>Download All</Button>
         <Button variant="outline">Share</Button>
+      </div>
+
+      <div className="mt-10 border-t border-border pt-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-base font-semibold">Generate more</h3>
+            <p className="text-sm text-muted-foreground">
+              Create additional mockups for this same product photo.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Select value={String(moreCount)} onValueChange={(v) => setMoreCount(Number(v))}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">+1 image</SelectItem>
+                <SelectItem value="4">+4 images</SelectItem>
+                <SelectItem value="8">+8 images</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              disabled={project.generation?.status === 'generating'}
+              onClick={() => {
+                const totalNow =
+                  typeof project.generation?.total === 'number'
+                    ? project.generation.total
+                    : project.generatedImages.length
+                const newTotal = totalNow + moreCount
+                const completed = project.generatedImages.length
+                const nextType = types[completed % types.length]
+
+                updateProject(projectId, {
+                  generation: {
+                    status: 'generating',
+                    total: newTotal,
+                    completed,
+                    nextType,
+                  },
+                })
+              }}
+            >
+              {project.generation?.status === 'generating' ? 'Generating…' : 'Generate more'}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   )

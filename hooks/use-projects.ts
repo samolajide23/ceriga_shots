@@ -26,34 +26,95 @@ export interface Project {
   updatedAt: number
 }
 
-const STORAGE_KEY = 'ceriga_projects'
+const LEGACY_STORAGE_KEY = 'ceriga_projects'
+
+// IndexedDB storage (to avoid localStorage quota limits for base64 image data).
+const DB_NAME = 'ceriga_shots'
+const DB_VERSION = 1
+const STORE_NAME = 'kv'
+const PROJECTS_KEY = 'projects'
+
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION)
+    req.onupgradeneeded = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME)
+      }
+    }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error ?? new Error('Failed to open IndexedDB'))
+  })
+}
+
+async function idbGet<T>(key: string): Promise<T | undefined> {
+  const db = await openDb()
+  return await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly')
+    const store = tx.objectStore(STORE_NAME)
+    const req = store.get(key)
+    req.onsuccess = () => resolve(req.result as T | undefined)
+    req.onerror = () => reject(req.error ?? new Error('IndexedDB get failed'))
+  })
+}
+
+async function idbSet<T>(key: string, value: T): Promise<void> {
+  const db = await openDb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    const store = tx.objectStore(STORE_NAME)
+    const req = store.put(value as unknown, key)
+    req.onsuccess = () => resolve()
+    req.onerror = () => reject(req.error ?? new Error('IndexedDB set failed'))
+  })
+}
 
 export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load projects from localStorage on mount
+  // Load projects from IndexedDB on mount (migrating from localStorage if needed)
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        setProjects(JSON.parse(stored))
+    let cancelled = false
+    ;(async () => {
+      try {
+        const stored = await idbGet<Project[]>(PROJECTS_KEY)
+        if (!cancelled && stored) {
+          setProjects(stored)
+          return
+        }
+
+        // One-time legacy migration (best effort).
+        const legacy = localStorage.getItem(LEGACY_STORAGE_KEY)
+        if (legacy) {
+          const parsed = JSON.parse(legacy) as Project[]
+          await idbSet(PROJECTS_KEY, parsed)
+          localStorage.removeItem(LEGACY_STORAGE_KEY)
+          if (!cancelled) setProjects(parsed)
+        }
+      } catch (error) {
+        console.error('Failed to load projects:', error)
+      } finally {
+        if (!cancelled) setIsLoading(false)
       }
-    } catch (error) {
-      console.error('Failed to load projects:', error)
-    } finally {
-      setIsLoading(false)
+    })()
+
+    return () => {
+      cancelled = true
     }
   }, [])
 
-  // Save projects to localStorage whenever they change
+  // Save projects to IndexedDB whenever they change
   useEffect(() => {
     if (!isLoading) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(projects))
-      } catch (error) {
-        console.error('Failed to save projects:', error)
-      }
+      ;(async () => {
+        try {
+          await idbSet(PROJECTS_KEY, projects)
+        } catch (error) {
+          console.error('Failed to save projects:', error)
+        }
+      })()
     }
   }, [projects, isLoading])
 
