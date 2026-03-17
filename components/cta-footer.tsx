@@ -26,7 +26,7 @@ export function CtaSection() {
         </p>
 
         <Link
-          href="#upload"
+          href="/dashboard/generate"
           className="inline-flex items-center gap-3 bg-foreground text-background text-sm font-semibold tracking-wider uppercase px-10 py-5 hover:bg-accent hover:text-foreground transition-all duration-300 group"
         >
           Upload Your Design
