@@ -1,14 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 
 export default function SettingsPage() {
   const [formData, setFormData] = useState({
-    businessName: localStorage.getItem('business_name') || '',
-    email: localStorage.getItem('email') || '',
-    category: localStorage.getItem('category') || 'apparel',
+    businessName: '',
+    email: '',
+    category: 'apparel',
   })
+
+  useEffect(() => {
+    setFormData({
+      businessName: window.localStorage.getItem('business_name') || '',
+      email: window.localStorage.getItem('email') || '',
+      category: window.localStorage.getItem('category') || 'apparel',
+    })
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -16,9 +24,9 @@ export default function SettingsPage() {
   }
 
   const handleSave = () => {
-    localStorage.setItem('business_name', formData.businessName)
-    localStorage.setItem('email', formData.email)
-    localStorage.setItem('category', formData.category)
+    window.localStorage.setItem('business_name', formData.businessName)
+    window.localStorage.setItem('email', formData.email)
+    window.localStorage.setItem('category', formData.category)
     alert('Settings saved!')
   }
 
@@ -82,9 +90,9 @@ export default function SettingsPage() {
               variant="outline"
               className="text-destructive"
               onClick={() => {
-                if (confirm('Clear all data? This cannot be undone.')) {
-                  localStorage.clear()
-                  location.reload()
+                if (window.confirm('Clear all data? This cannot be undone.')) {
+                  window.localStorage.clear()
+                  window.location.reload()
                 }
               }}
             >
