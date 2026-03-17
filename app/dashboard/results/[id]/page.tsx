@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useMemo, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { useProjects } from '@/hooks/use-projects'
 import { Button } from '@/components/ui/button'
@@ -8,8 +9,139 @@ import Link from 'next/link'
 export default function ResultsPage() {
   const params = useParams()
   const projectId = params.id as string
-  const { getProject } = useProjects()
+  const { getProject, updateProject } = useProjects()
   const project = getProject(projectId)
+  const isRunningRef = useRef(false)
+
+  const types = useMemo<Array<'flat-lay' | 'product-shot' | 'detail' | 'lifestyle'>>(
+    () => ['flat-lay', 'product-shot', 'detail', 'lifestyle'],
+    []
+  )
+
+  useEffect(() => {
+    if (!project) return
+    const shouldGenerate =
+      project.generation?.status === 'generating' &&
+      project.generation.completed < project.generation.total
+
+    if (!shouldGenerate || isRunningRef.current) return
+
+    isRunningRef.current = true
+
+    const run = async () => {
+      const total = project.generation?.total ?? 0
+      let completed = project.generation?.completed ?? project.generatedImages.length
+      const images = [...project.generatedImages]
+
+      console.info('[results] generation start', { projectId, total, completed })
+
+      while (completed < total) {
+        const nextType = types[completed % types.length]
+        updateProject(projectId, {
+          generation: {
+            status: 'generating',
+            total,
+            completed,
+            nextType,
+          },
+        })
+
+        const startedAt = performance.now()
+        console.info(`[results] generating ${completed + 1}/${total}`, { nextType })
+
+        try {
+          const res = await fetch('/api/mockups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageDataUrl: project.originalImage,
+              type: nextType,
+              attempts: 2,
+            }),
+          })
+
+          const data = (await res.json()) as
+            | {
+                generatedImage: {
+                  id: string
+                  type: 'flat-lay' | 'product-shot' | 'lifestyle' | 'detail'
+                  url: string
+                  timestamp: number
+                }
+              }
+            | { error: string }
+
+          if (!res.ok || 'error' in data) {
+            const message = 'error' in data ? data.error : 'Please try again.'
+            console.error('[results] generation failed', {
+              status: res.status,
+              message,
+              ms: Math.round(performance.now() - startedAt),
+            })
+            updateProject(projectId, {
+              generation: {
+                status: 'error',
+                total,
+                completed,
+                nextType,
+                errorMessage: message,
+              },
+            })
+            return
+          }
+
+          images.push(data.generatedImage)
+          updateProject(projectId, {
+            generatedImages: images,
+            generation: {
+              status: 'generating',
+              total,
+              completed: completed + 1,
+            },
+          })
+          completed += 1
+          console.info(`[results] done ${completed}/${total}`, {
+            ms: Math.round(performance.now() - startedAt),
+          })
+        } catch (e) {
+          const message = e instanceof Error ? e.message : 'Unknown error'
+          console.error('[results] generation error', { message })
+          updateProject(projectId, {
+            generation: {
+              status: 'error',
+              total,
+              completed,
+              nextType,
+              errorMessage: message,
+            },
+          })
+          return
+        }
+      }
+
+      updateProject(projectId, {
+        generation: {
+          status: 'complete',
+          total,
+          completed: total,
+        },
+      })
+      console.info('[results] generation complete', { projectId, total })
+    }
+
+    run().finally(() => {
+      isRunningRef.current = false
+    })
+  }, [
+    project?.generation?.status,
+    project?.generation?.completed,
+    project?.generation?.total,
+    project?.generatedImages,
+    project?.originalImage,
+    projectId,
+    types,
+    updateProject,
+  ])
 
   if (!project) {
     return (
@@ -22,6 +154,18 @@ export default function ResultsPage() {
     )
   }
 
+  const generationLabel = project.generation
+    ? project.generation.status === 'generating'
+      ? `Generating ${project.generation.completed}/${project.generation.total}${
+          project.generation.nextType ? ` • Next: ${project.generation.nextType}` : ''
+        }`
+      : project.generation.status === 'complete'
+        ? `Complete • ${project.generation.completed}/${project.generation.total}`
+        : project.generation.status === 'error'
+          ? `Error • ${project.generation.completed}/${project.generation.total}`
+          : ''
+    : ''
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -32,6 +176,12 @@ export default function ResultsPage() {
         <p className="text-muted-foreground">
           {new Date(project.createdAt).toLocaleDateString()}
         </p>
+        {generationLabel ? (
+          <p className="text-sm text-muted-foreground mt-2">{generationLabel}</p>
+        ) : null}
+        {project.generation?.status === 'error' && project.generation.errorMessage ? (
+          <p className="text-sm text-destructive mt-2">{project.generation.errorMessage}</p>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-8">
@@ -64,6 +214,24 @@ export default function ResultsPage() {
                 </p>
               </div>
             ))}
+            {project.generation?.status === 'generating'
+              ? Array.from(
+                  { length: Math.max(0, project.generation.total - project.generatedImages.length) },
+                  (_, i) => (
+                    <div
+                      key={`placeholder-${i}`}
+                      className="rounded-lg overflow-hidden border border-border bg-secondary/50"
+                    >
+                      <div className="w-full aspect-square flex items-center justify-center">
+                        <p className="text-xs text-muted-foreground">Generating…</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground p-2 bg-card text-center">
+                        Pending
+                      </p>
+                    </div>
+                  )
+                )
+              : null}
           </div>
         </div>
       </div>

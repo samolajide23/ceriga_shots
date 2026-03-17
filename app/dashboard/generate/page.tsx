@@ -7,12 +7,20 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Upload } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export default function GeneratePage() {
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string>('')
   const [isDragging, setIsDragging] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [assetCount, setAssetCount] = useState<number>(4)
   const { addProject } = useProjects()
   const router = useRouter()
 
@@ -56,39 +64,16 @@ export default function GeneratePage() {
 
     setIsLoading(true)
     try {
-      // Simulate image generation
-      await new Promise(resolve => setTimeout(resolve, 2000))
-
       const project = addProject({
         name: file.name.replace(/\.[^/.]+$/, ''),
         originalImage: preview,
         originalImageName: file.name,
-        generatedImages: [
-          {
-            id: '1',
-            type: 'flat-lay',
-            url: '/images/hoodie-flatlay.jpg',
-            timestamp: Date.now(),
-          },
-          {
-            id: '2',
-            type: 'product-shot',
-            url: '/images/hoodie-angle.jpg',
-            timestamp: Date.now(),
-          },
-          {
-            id: '3',
-            type: 'detail',
-            url: '/images/hoodie-closeup.jpg',
-            timestamp: Date.now(),
-          },
-          {
-            id: '4',
-            type: 'lifestyle',
-            url: '/images/hoodie-lifestyle.jpg',
-            timestamp: Date.now(),
-          },
-        ],
+        generatedImages: [],
+        generation: {
+          status: 'generating',
+          total: assetCount,
+          completed: 0,
+        },
       })
 
       router.push(`/dashboard/results/${project.id}`)
@@ -114,6 +99,24 @@ export default function GeneratePage() {
               Drop your front or back design. We handle the rest — flat lays, angles, lifestyle shots,
               and motion content.
             </p>
+
+            <div className="mt-6 flex items-center justify-between gap-4">
+              <div className="text-xs text-muted-foreground tracking-widest uppercase">
+                Number of assets
+              </div>
+              <Select value={String(assetCount)} onValueChange={(v) => setAssetCount(Number(v))}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 asset</SelectItem>
+                  <SelectItem value="4">4 assets</SelectItem>
+                  <SelectItem value="8">8 assets</SelectItem>
+                  <SelectItem value="12">12 assets</SelectItem>
+                  <SelectItem value="16">16 assets</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div
