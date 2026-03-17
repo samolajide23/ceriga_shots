@@ -1,0 +1,72 @@
+'use client'
+
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { useProjects } from '@/hooks/use-projects'
+
+export default function DashboardHome() {
+  const { projects } = useProjects()
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <div className="mb-12">
+        <h1 className="text-4xl font-bold mb-4 text-balance">Welcome to Ceriga Shots</h1>
+        <p className="text-lg text-muted-foreground mb-8">Create AI-generated product content for your designs in seconds.</p>
+        
+        <div className="grid grid-cols-3 gap-6">
+          <Link href="/dashboard/generate">
+            <Button variant="outline" className="w-full h-32 flex flex-col items-center justify-center gap-3 text-center">
+              <div className="text-3xl">+</div>
+              <div>
+                <div className="font-semibold">Create New</div>
+                <div className="text-xs text-muted-foreground">Start generating content</div>
+              </div>
+            </Button>
+          </Link>
+
+          <div className="border border-border rounded-lg p-6 flex flex-col items-center justify-center gap-2 text-center">
+            <div className="text-2xl font-bold">{projects.length}</div>
+            <div className="text-sm text-muted-foreground">Projects Created</div>
+          </div>
+
+          <Link href="/dashboard/library">
+            <Button variant="outline" className="w-full h-32 flex flex-col items-center justify-center gap-3 text-center">
+              <div className="text-3xl">→</div>
+              <div>
+                <div className="font-semibold">View Library</div>
+                <div className="text-xs text-muted-foreground">All your projects</div>
+              </div>
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {projects.length > 0 && (
+        <div>
+          <h2 className="text-2xl font-bold mb-6">Recent Projects</h2>
+          <div className="grid grid-cols-4 gap-4">
+            {projects.slice(0, 4).map((project) => (
+              <Link key={project.id} href={`/dashboard/results/${project.id}`}>
+                <div className="border border-border rounded-lg overflow-hidden hover:border-accent transition-colors cursor-pointer">
+                  <div className="aspect-square bg-secondary overflow-hidden">
+                    <img
+                      src={project.originalImage}
+                      alt={project.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <p className="font-medium truncate">{project.name}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {project.generatedImages.length} assets
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
