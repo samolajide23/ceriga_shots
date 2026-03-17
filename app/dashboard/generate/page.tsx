@@ -98,58 +98,101 @@ export default function GeneratePage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Generate Product Content</h1>
-        <p className="text-muted-foreground">Upload your design to generate photos and videos</p>
-      </div>
-
+    <div className="p-8 max-w-[70vw] mx-auto">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Upload Area */}
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-            isDragging ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'
-          }`}
-        >
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-            className="hidden"
-            id="file-input"
-          />
-          <label htmlFor="file-input" className="cursor-pointer">
-            <div className="space-y-2">
-              <div className="mx-auto w-12 h-12 rounded-md border border-border flex items-center justify-center text-muted-foreground">
-                <Upload className="w-5 h-5" />
-              </div>
-              <p className="font-medium">Drop your image here</p>
-              <p className="text-sm text-muted-foreground">or click to browse</p>
-            </div>
-          </label>
-        </div>
+        <div className="space-y-6">
+          <div>
+            <span className="flex items-center gap-3 mb-4">
+              <span className="w-6 h-px bg-accent" />
+              <span className="text-accent text-xs tracking-[0.3em] uppercase font-medium">
+                Start Here
+              </span>
+            </span>
+            <h1 className="text-3xl font-bold mb-2">Upload your design</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Drop your front or back design. We handle the rest — flat lays, angles, lifestyle shots,
+              and motion content.
+            </p>
+          </div>
 
-        {/* Preview */}
-        {preview && (
-          <div className="space-y-4">
-            <div className="relative w-full aspect-square rounded-lg overflow-hidden border border-border">
-              <Image src={preview} alt="Preview" fill className="object-cover" sizes="(min-width: 1024px) 512px, 100vw" />
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Selected: {file?.name}</p>
-              <Button
-                onClick={handleGenerate}
-                disabled={isLoading}
-                className="w-full"
-              >
-                {isLoading ? 'Generating...' : 'Generate Content'}
-              </Button>
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors w-[70vw] max-w-full ${
+              isDragging ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'
+            }`}
+          >
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              className="hidden"
+              id="file-input"
+            />
+            <div className="flex flex-col gap-4">
+              <label htmlFor="file-input" className="block cursor-pointer space-y-4">
+                {preview ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground truncate">
+                      {file?.name ?? 'Uploaded design'}
+                    </p>
+                    <div className="relative w-full aspect-video rounded-md overflow-hidden border border-border bg-secondary">
+                      <Image
+                        src={preview}
+                        alt="Uploaded design preview"
+                        fill
+                        className="object-contain"
+                        sizes="(min-width: 1024px) 512px, 100vw"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Click or drop a new file to replace.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">No file chosen</p>
+                    <div className="mx-auto w-16 h-16 rounded-md border border-border flex items-center justify-center text-muted-foreground">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-foreground font-semibold mb-1">
+                        Drag &amp; drop or click to upload
+                      </p>
+                      <p className="text-sm text-muted-foreground">Upload front or back design</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    PNG
+                  </span>
+                  <span className="w-px h-3 bg-border" />
+                  <span className="flex items-center gap-1.5">
+                    JPG
+                  </span>
+                  <span className="w-px h-3 bg-border" />
+                  <span>Max 20MB</span>
+                </div>
+              </label>
+
+              {preview && (
+                <Button
+                  onClick={handleGenerate}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  {isLoading ? 'Generating...' : 'Generate Content'}
+                </Button>
+              )}
             </div>
           </div>
-        )}
+        </div>
+
+        {/* Right column intentionally left for future settings or tips */}
       </div>
     </div>
   )

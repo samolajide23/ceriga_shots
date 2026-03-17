@@ -24,16 +24,28 @@ export function Navbar() {
         </Link>
 
         <ul className="hidden md:flex items-center gap-8 text-xs text-muted-foreground tracking-widest uppercase">
-          <li><Link href="#how-it-works" className="hover:text-foreground transition-colors">How it works</Link></li>
-          <li><Link href="#gallery" className="hover:text-foreground transition-colors">Examples</Link></li>
-          <li><Link href="#upload" className="hover:text-foreground transition-colors">Upload</Link></li>
+          <li>
+            <Link href="/dashboard/generate" className="hover:text-foreground transition-colors">
+              Generate
+            </Link>
+          </li>
+          <li>
+            <Link href="/dashboard/library" className="hover:text-foreground transition-colors">
+              Library
+            </Link>
+          </li>
+          <li>
+            <Link href="/dashboard/settings" className="hover:text-foreground transition-colors">
+              Settings
+            </Link>
+          </li>
         </ul>
 
         <Link
-          href="#upload"
+          href="/dashboard/generate"
           className="text-xs tracking-widest uppercase bg-foreground text-background px-5 py-2.5 hover:bg-accent hover:text-foreground transition-colors duration-300"
         >
-          Get Started
+          Launch Studio
         </Link>
       </nav>
     </header>
