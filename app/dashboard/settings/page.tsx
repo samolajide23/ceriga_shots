@@ -2,6 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/hooks/use-toast'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
 export default function SettingsPage() {
   const [formData, setFormData] = useState({
@@ -9,13 +21,16 @@ export default function SettingsPage() {
     email: '',
     category: 'apparel',
   })
+  const [initialData, setInitialData] = useState(formData)
 
   useEffect(() => {
-    setFormData({
+    const next = {
       businessName: window.localStorage.getItem('business_name') || '',
       email: window.localStorage.getItem('email') || '',
       category: window.localStorage.getItem('category') || 'apparel',
-    })
+    }
+    setFormData(next)
+    setInitialData(next)
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -27,7 +42,10 @@ export default function SettingsPage() {
     window.localStorage.setItem('business_name', formData.businessName)
     window.localStorage.setItem('email', formData.email)
     window.localStorage.setItem('category', formData.category)
-    alert('Settings saved!')
+    setInitialData(formData)
+    toast({
+      title: 'Settings saved',
+    })
   }
 
   return (
@@ -86,25 +104,43 @@ export default function SettingsPage() {
             <p className="text-sm text-muted-foreground">
               All your projects are stored locally on this device.
             </p>
-            <Button
-              variant="outline"
-              className="text-destructive"
-              onClick={() => {
-                if (window.confirm('Clear all data? This cannot be undone.')) {
-                  window.localStorage.clear()
-                  window.location.reload()
-                }
-              }}
-            >
-              Clear All Data
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="text-destructive">
+                  Clear All Data
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear all local data?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will remove all projects and settings stored on this device. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => {
+                      window.localStorage.clear()
+                      toast({ title: 'Local data cleared' })
+                      window.location.reload()
+                    }}
+                  >
+                    Clear data
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
 
         {/* Save Button */}
         <div className="flex gap-4">
           <Button onClick={handleSave}>Save Changes</Button>
-          <Button variant="outline">Cancel</Button>
+          <Button variant="outline" onClick={() => setFormData(initialData)}>
+            Cancel
+          </Button>
         </div>
       </div>
     </div>

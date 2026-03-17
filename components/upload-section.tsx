@@ -1,28 +1,41 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Upload, Image as ImageIcon } from "lucide-react"
+
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 export function UploadSection() {
   const [isDragging, setIsDragging] = useState(false)
   const [uploaded, setUploaded] = useState<string | null>(null)
 
+  useEffect(() => {
+    return () => {
+      if (uploaded) URL.revokeObjectURL(uploaded)
+    }
+  }, [uploaded])
+
+  const handleFile = useCallback((file: File | undefined) => {
+    if (!file) return
+    if (file.size > MAX_UPLOAD_BYTES) return
+    if (file.type !== "image/png" && file.type !== "image/jpeg") return
+
+    const url = URL.createObjectURL(file)
+    setUploaded((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return url
+    })
+  }, [])
+
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setIsDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file && (file.type === "image/png" || file.type === "image/jpeg")) {
-      const url = URL.createObjectURL(file)
-      setUploaded(url)
-    }
-  }, [])
+    handleFile(e.dataTransfer.files[0])
+  }, [handleFile])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const url = URL.createObjectURL(file)
-      setUploaded(url)
-    }
+    handleFile(e.target.files?.[0])
+    e.currentTarget.value = ""
   }
 
   return (
@@ -97,7 +110,12 @@ export function UploadSection() {
             Generate Content Pack
           </button>
           <button
-            onClick={() => setUploaded(null)}
+            onClick={() =>
+              setUploaded((prev) => {
+                if (prev) URL.revokeObjectURL(prev)
+                return null
+              })
+            }
             className="border border-border text-muted-foreground text-sm tracking-wider uppercase px-8 py-4 hover:border-foreground hover:text-foreground transition-all duration-300"
           >
             Clear

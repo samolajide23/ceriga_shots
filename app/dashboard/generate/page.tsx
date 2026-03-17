@@ -5,6 +5,8 @@ import Image from 'next/image'
 import { useProjects } from '@/hooks/use-projects'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Upload } from 'lucide-react'
+import { toast } from '@/hooks/use-toast'
 
 export default function GeneratePage() {
   const [file, setFile] = useState<File | null>(null)
@@ -16,7 +18,11 @@ export default function GeneratePage() {
 
   const handleFile = (selectedFile: File) => {
     if (!selectedFile.type.startsWith('image/')) {
-      alert('Please select an image file')
+      toast({
+        title: 'Unsupported file',
+        description: 'Please select an image file.',
+        variant: 'destructive',
+      })
       return
     }
 
@@ -98,7 +104,7 @@ export default function GeneratePage() {
         <p className="text-muted-foreground">Upload your design to generate photos and videos</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Upload Area */}
         <div
           onDragOver={handleDragOver}
@@ -117,7 +123,9 @@ export default function GeneratePage() {
           />
           <label htmlFor="file-input" className="cursor-pointer">
             <div className="space-y-2">
-              <div className="text-4xl">📸</div>
+              <div className="mx-auto w-12 h-12 rounded-md border border-border flex items-center justify-center text-muted-foreground">
+                <Upload className="w-5 h-5" />
+              </div>
               <p className="font-medium">Drop your image here</p>
               <p className="text-sm text-muted-foreground">or click to browse</p>
             </div>
@@ -128,11 +136,7 @@ export default function GeneratePage() {
         {preview && (
           <div className="space-y-4">
             <div className="relative w-full aspect-square rounded-lg overflow-hidden border border-border">
-              <img
-                src={preview}
-                alt="Preview"
-                className="w-full h-full object-cover"
-              />
+              <Image src={preview} alt="Preview" fill className="object-cover" sizes="(min-width: 1024px) 512px, 100vw" />
             </div>
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Selected: {file?.name}</p>

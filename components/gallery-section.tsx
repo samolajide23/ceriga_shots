@@ -42,6 +42,11 @@ export function GallerySection() {
                 alt={item.label}
                 fill
                 className="object-cover group-hover:scale-105 transition-transform duration-700"
+                sizes={
+                  item.span.includes("col-span-2")
+                    ? "(min-width: 1024px) 50vw, (min-width: 640px) 100vw, 100vw"
+                    : "(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+                }
               />
               <div className="absolute inset-0 bg-background/0 group-hover:bg-background/50 transition-all duration-400" />
               <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">

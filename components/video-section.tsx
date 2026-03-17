@@ -1,7 +1,15 @@
 "use client"
 
+import { useState } from "react"
 import { Play } from "lucide-react"
 import Image from "next/image"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 const videoPreviews = [
   { src: "/images/hoodie-lifestyle.jpg", platform: "TikTok", duration: "0:15" },
@@ -10,6 +18,8 @@ const videoPreviews = [
 ]
 
 export function VideoSection() {
+  const [selected, setSelected] = useState<(typeof videoPreviews)[number] | null>(null)
+
   return (
     <section className="py-32 max-w-7xl mx-auto px-6 lg:px-12">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -38,9 +48,12 @@ export function VideoSection() {
         {/* Video previews */}
         <div className="flex gap-3 justify-center lg:justify-end">
           {videoPreviews.map((video, i) => (
-            <div
+            <button
+              type="button"
               key={video.platform}
-              className={`relative overflow-hidden group cursor-pointer flex-shrink-0 ${
+              onClick={() => setSelected(video)}
+              aria-label={`Open ${video.platform} preview (${video.duration})`}
+              className={`relative overflow-hidden group flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                 i === 1 ? "w-44 aspect-[9/16]" : "w-36 aspect-[9/16] mt-8"
               }`}
               style={{ transform: i === 0 ? "rotate(-2deg)" : i === 2 ? "rotate(2deg)" : "none" }}
@@ -50,6 +63,7 @@ export function VideoSection() {
                 alt={`${video.platform} video preview`}
                 fill
                 className="object-cover group-hover:scale-105 transition-transform duration-700"
+                sizes={i === 1 ? "(min-width: 1024px) 176px, 176px" : "(min-width: 1024px) 144px, 144px"}
               />
               {/* Dark overlay */}
               <div className="absolute inset-0 bg-background/40 group-hover:bg-background/20 transition-colors duration-300" />
@@ -66,10 +80,32 @@ export function VideoSection() {
                 <span className="text-[10px] tracking-widest uppercase text-foreground font-semibold">{video.platform}</span>
                 <span className="text-[9px] text-foreground/60">{video.duration}</span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
+
+      <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          {selected && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selected.platform} preview</DialogTitle>
+                <DialogDescription>Sample motion clip concept ({selected.duration}).</DialogDescription>
+              </DialogHeader>
+              <div className="relative w-full aspect-[9/16] overflow-hidden rounded-md border border-border bg-card">
+                <Image
+                  src={selected.src}
+                  alt={`${selected.platform} preview`}
+                  fill
+                  className="object-cover"
+                  sizes="(min-width: 640px) 512px, 90vw"
+                />
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }
