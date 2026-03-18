@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { deleteProjectForUser, getProjectForUser, updateProjectForUser } from '@/lib/projects'
 import type { Project } from '@/hooks/use-projects'
+import { isDatabaseConfigured } from '@/lib/db'
 
 export async function GET(_req: NextRequest): Promise<NextResponse> {
   const url = new URL(_req.url)
@@ -12,6 +13,13 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json(
+      { error: 'Database is not configured (missing DATABASE_URL).' },
+      { status: 503 }
+    )
   }
 
   try {
@@ -33,6 +41,13 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json(
+      { error: 'Database is not configured (missing DATABASE_URL).' },
+      { status: 503 }
+    )
   }
 
   let body: unknown
@@ -63,6 +78,13 @@ export async function DELETE(_req: NextRequest): Promise<NextResponse> {
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json(
+      { error: 'Database is not configured (missing DATABASE_URL).' },
+      { status: 503 }
+    )
   }
 
   try {

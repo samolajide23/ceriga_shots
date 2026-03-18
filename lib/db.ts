@@ -1,23 +1,32 @@
 import { neon } from '@neondatabase/serverless'
 
+export function isDatabaseConfigured() {
+  return process.env.DATABASE_URL != null && process.env.DATABASE_URL !== ''
+}
+
 // Lazily fail at query time rather than import time so type-check/build
 // environments that don't load .env still succeed.
 export const db =
-  process.env.DATABASE_URL != null && process.env.DATABASE_URL !== ''
-    ? neon(process.env.DATABASE_URL)
+  isDatabaseConfigured() ? neon(process.env.DATABASE_URL!)
     : ((() => {
         throw new Error('DATABASE_URL is not set')
       }) as unknown as ReturnType<typeof neon>)
 
 export async function ensureSchema() {
+  // Neon serverless prepared statements can't include multiple SQL commands.
+  // Execute schema statements individually.
+  await db`create extension if not exists pgcrypto`
+
   await db`
     create table if not exists users (
       id uuid primary key default gen_random_uuid(),
       email text not null unique,
       password_hash text not null,
       created_at timestamptz not null default now()
-    );
+    )
+  `
 
+  await db`
     create table if not exists projects (
       id uuid primary key default gen_random_uuid(),
       owner_id text not null,
@@ -28,9 +37,10 @@ export async function ensureSchema() {
       generation jsonb,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
-    );
-    create index if not exists projects_owner_id_idx on projects(owner_id);
+    )
   `
+
+  await db`create index if not exists projects_owner_id_idx on projects(owner_id)`
 }
 
 

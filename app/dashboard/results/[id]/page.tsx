@@ -16,15 +16,55 @@ import {
 export default function ResultsPage() {
   const params = useParams()
   const projectId = params.id as string
-  const { getProject, updateProject } = useProjects()
+  const { getProject, fetchProject, updateProject } = useProjects()
   const project = getProject(projectId)
   const isRunningRef = useRef(false)
   const [moreCount, setMoreCount] = useState<number>(4)
+  const [isHydrating, setIsHydrating] = useState(false)
+  const [hydrateFailed, setHydrateFailed] = useState<string | null>(null)
 
   const types = useMemo<Array<'flat-lay' | 'product-shot' | 'detail' | 'lifestyle'>>(
     () => ['flat-lay', 'product-shot', 'detail', 'lifestyle'],
     []
   )
+
+  const formatViewTitle = (t: 'flat-lay' | 'product-shot' | 'detail' | 'lifestyle') => {
+    switch (t) {
+      case 'flat-lay':
+        return 'Flat Lay'
+      case 'product-shot':
+        return 'Product Shot'
+      case 'detail':
+        return 'Detail'
+      case 'lifestyle':
+        return 'Lifestyle'
+    }
+  }
+
+  useEffect(() => {
+    if (project) return
+    let cancelled = false
+    setIsHydrating(true)
+    setHydrateFailed(null)
+
+    fetchProject(projectId)
+      .then((p) => {
+        if (cancelled) return
+        if (!p) setHydrateFailed('Project not found')
+      })
+      .catch((e) => {
+        if (cancelled) return
+        setHydrateFailed(e instanceof Error ? e.message : 'Failed to load project')
+      })
+      .finally(() => {
+        if (cancelled) return
+        setIsHydrating(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [fetchProject, project, projectId])
 
   useEffect(() => {
     if (!project) return
@@ -157,7 +197,9 @@ export default function ResultsPage() {
   if (!project) {
     return (
       <div className="p-8 text-center">
-        <p className="text-muted-foreground">Project not found</p>
+        <p className="text-muted-foreground">
+          {isHydrating ? 'Loading project…' : hydrateFailed ?? 'Project not found'}
+        </p>
         <Link href="/dashboard/library">
           <Button className="mt-4">Back to Library</Button>
         </Link>
@@ -215,11 +257,19 @@ export default function ResultsPage() {
                 key={img.id}
                 className="rounded-lg overflow-hidden border border-border hover:border-accent transition-colors"
               >
-                <img
-                  src={img.url}
-                  alt={img.type}
-                  className="w-full aspect-square object-cover"
-                />
+                {img.url ? (
+                  <img
+                    src={img.url}
+                    alt={img.type}
+                    className="w-full aspect-square object-cover"
+                  />
+                ) : (
+                  <div className="w-full aspect-square flex items-center justify-center bg-secondary/50">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {formatViewTitle(img.type)}
+                    </p>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground p-2 bg-card text-center capitalize">
                   {img.type.replace('-', ' ')}
                 </p>

@@ -64,7 +64,7 @@ export default function GeneratePage() {
 
     setIsLoading(true)
     try {
-      const project = addProject({
+      const project = await addProject({
         name: file.name.replace(/\.[^/.]+$/, ''),
         originalImage: preview,
         originalImageName: file.name,

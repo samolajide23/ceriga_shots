@@ -252,14 +252,43 @@ export async function POST(req: Request) {
 
   const apiKey = getApiKey()
   if (!apiKey) {
-    console.error(`[mockups:${requestId}] Missing API key`)
-    return NextResponse.json(
-      {
-        error:
-          'Missing API key. Set GOOGLE_API_KEY (preferred) or GEMINI_API_KEY in your environment.',
+    // Graceful деградация: when no Gemini key is configured, return a placeholder
+    // "generated image" so the UI can render empty tiles instead of failing.
+    let body: unknown
+    try {
+      body = await req.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
+    }
+
+    const requestedType = (body as { type?: unknown }).type
+    const type: MockupType | undefined =
+      requestedType === 'flat-lay' ||
+      requestedType === 'product-shot' ||
+      requestedType === 'detail' ||
+      requestedType === 'lifestyle'
+        ? requestedType
+        : undefined
+
+    if (!type) {
+      return NextResponse.json(
+        { error: 'type is required and must be one of: flat-lay, product-shot, detail, lifestyle.' },
+        { status: 400 }
+      )
+    }
+
+    console.warn(`[mockups:${requestId}] Missing API key; returning placeholder for type=${type}`)
+    return NextResponse.json({
+      generatedImage: {
+        id:
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`,
+        type,
+        url: '',
+        timestamp: Date.now(),
       },
-      { status: 500 }
-    )
+      placeholder: true,
+      warning: 'Missing API key. Set GOOGLE_API_KEY (preferred) or GEMINI_API_KEY to enable image generation.',
+    })
   }
 
   let body: unknown

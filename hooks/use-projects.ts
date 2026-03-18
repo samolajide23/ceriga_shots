@@ -30,6 +30,16 @@ export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  const upsertProject = useCallback((project: Project) => {
+    setProjects((prev) => {
+      const idx = prev.findIndex((p) => p.id === project.id)
+      if (idx === -1) return [project, ...prev]
+      const next = [...prev]
+      next[idx] = project
+      return next
+    })
+  }, [])
+
   // Load projects for the current user from the API on mount
   useEffect(() => {
     let cancelled = false
@@ -55,17 +65,17 @@ export function useProjects() {
     }
   }, [])
 
-  const addProject = useCallback((project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const now = Date.now()
-    const optimistic: Project = {
-      ...project,
-      id: `temp-${now}`,
-      createdAt: now,
-      updatedAt: now,
-    }
-    setProjects(prev => [optimistic, ...prev])
+  const addProject = useCallback(
+    async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> => {
+      const now = Date.now()
+      const optimistic: Project = {
+        ...project,
+        id: `temp-${now}`,
+        createdAt: now,
+        updatedAt: now,
+      }
+      setProjects((prev) => [optimistic, ...prev])
 
-    ;(async () => {
       try {
         const res = await fetch('/api/projects', {
           method: 'POST',
@@ -77,17 +87,16 @@ export function useProjects() {
           throw new Error(`Failed to create project: ${res.status}`)
         }
         const data = (await res.json()) as { project: Project }
-        setProjects(prev =>
-          prev.map(p => (p.id === optimistic.id ? data.project : p))
-        )
+        setProjects((prev) => prev.map((p) => (p.id === optimistic.id ? data.project : p)))
+        return data.project
       } catch (error) {
         console.error('Failed to create project:', error)
-        setProjects(prev => prev.filter(p => p.id !== optimistic.id))
+        setProjects((prev) => prev.filter((p) => p.id !== optimistic.id))
+        throw error
       }
-    })()
-
-    return optimistic
-  }, [])
+    },
+    []
+  )
 
   const updateProject = useCallback((id: string, updates: Partial<Project>) => {
     setProjects(prev =>
@@ -137,6 +146,23 @@ export function useProjects() {
     return projects.find(p => p.id === id)
   }, [projects])
 
+  const fetchProject = useCallback(
+    async (id: string): Promise<Project | null> => {
+      try {
+        const res = await fetch(`/api/projects/${id}`, { method: 'GET' })
+        if (res.status === 404) return null
+        if (!res.ok) throw new Error(`Failed to load project: ${res.status}`)
+        const data = (await res.json()) as { project: Project }
+        if (data.project) upsertProject(data.project)
+        return data.project ?? null
+      } catch (error) {
+        console.error('Failed to load project:', error)
+        throw error
+      }
+    },
+    [upsertProject]
+  )
+
   return {
     projects,
     isLoading,
@@ -144,5 +170,6 @@ export function useProjects() {
     updateProject,
     deleteProject,
     getProject,
+    fetchProject,
   }
 }
