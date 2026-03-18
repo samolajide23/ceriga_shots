@@ -1,14 +1,15 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { FormEvent, Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -19,11 +20,12 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
+    const callbackUrl = searchParams.get('callbackUrl') ?? '/dashboard'
     const res = await signIn('credentials', {
       email,
       password,
       redirect: false,
-      callbackUrl: '/dashboard',
+      callbackUrl,
     })
 
     setLoading(false)
@@ -33,7 +35,7 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/dashboard')
+    router.push(callbackUrl)
   }
 
   return (
@@ -84,6 +86,20 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center px-4">
+          <div className="text-sm text-muted-foreground">Loading…</div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   )
 }
 

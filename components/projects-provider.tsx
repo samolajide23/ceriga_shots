@@ -3,6 +3,15 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { Project } from '@/types/projects'
 
+class HttpError extends Error {
+  status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'HttpError'
+    this.status = status
+  }
+}
+
 type ProjectsContextValue = {
   projects: Project[]
   isLoading: boolean
@@ -66,7 +75,12 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(project),
         })
-        if (!res.ok) throw new Error(`Failed to create project: ${res.status}`)
+        if (!res.ok) {
+          if (res.status === 401) {
+            throw new HttpError(401, 'You must be logged in to generate content.')
+          }
+          throw new HttpError(res.status, `Failed to create project: ${res.status}`)
+        }
         const data = (await res.json()) as { project: Project }
         setProjects((prev) => prev.map((p) => (p.id === optimistic.id ? data.project : p)))
         return data.project

@@ -45,6 +45,17 @@ export async function ensureSchema() {
   `
 
   await db`create index if not exists projects_owner_id_idx on projects(owner_id)`
+
+  await db`
+    create table if not exists project_shares (
+      token uuid primary key default gen_random_uuid(),
+      project_id uuid not null references projects(id) on delete cascade,
+      owner_id text not null,
+      created_at timestamptz not null default now()
+    )
+  `
+  await db`create index if not exists project_shares_project_id_idx on project_shares(project_id)`
+  await db`create index if not exists project_shares_owner_id_idx on project_shares(owner_id)`
 }
 
 

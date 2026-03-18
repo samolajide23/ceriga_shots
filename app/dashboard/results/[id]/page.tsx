@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Check, Pencil, X } from 'lucide-react'
+import { toast } from '@/hooks/use-toast'
 import {
   Select,
   SelectContent,
@@ -21,6 +22,8 @@ export default function ResultsPage() {
   const { getProject, fetchProject, updateProject } = useProjects()
   const project = getProject(projectId)
   const isRunningRef = useRef(false)
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [isSharing, setIsSharing] = useState(false)
   const [moreCount, setMoreCount] = useState<number>(4)
   const [isHydrating, setIsHydrating] = useState(false)
   const [hydrateFailed, setHydrateFailed] = useState<string | null>(null)
@@ -242,6 +245,51 @@ export default function ResultsPage() {
           : ''
     : ''
 
+  const downloadAll = async () => {
+    if (isDownloading) return
+    setIsDownloading(true)
+    try {
+      // Trigger a file download (server streams ZIP).
+      window.location.href = `/api/projects/${projectId}/download`
+    } finally {
+      // We can't reliably know when the download completes; re-enable quickly.
+      window.setTimeout(() => setIsDownloading(false), 1200)
+    }
+  }
+
+  const share = async () => {
+    if (isSharing) return
+    setIsSharing(true)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/share`, { method: 'POST' })
+      const data = (await res.json()) as { shareUrl?: string; error?: string }
+      if (!res.ok || !data.shareUrl) {
+        throw new Error(data.error || 'Failed to create share link')
+      }
+
+      const shareUrl = data.shareUrl
+      const canClipboard =
+        typeof navigator !== 'undefined' &&
+        !!navigator.clipboard &&
+        typeof navigator.clipboard.writeText === 'function'
+
+      if (canClipboard) {
+        await navigator.clipboard.writeText(shareUrl)
+        toast({ title: 'Share link copied', description: shareUrl })
+      } else {
+        toast({ title: 'Share link created', description: shareUrl })
+      }
+    } catch (e) {
+      toast({
+        title: 'Share failed',
+        description: e instanceof Error ? e.message : 'Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSharing(false)
+    }
+  }
+
   return (
     <div className="p-6 lg:p-8">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -312,8 +360,12 @@ export default function ResultsPage() {
         </div>
 
         <div className="flex gap-3 shrink-0">
-          <Button>Download All</Button>
-          <Button variant="outline">Share</Button>
+          <Button onClick={downloadAll} disabled={isDownloading}>
+            {isDownloading ? 'Preparing…' : 'Download All'}
+          </Button>
+          <Button variant="outline" onClick={share} disabled={isSharing}>
+            {isSharing ? 'Creating…' : 'Share'}
+          </Button>
         </div>
       </div>
 

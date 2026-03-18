@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Upload } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import { useSession } from 'next-auth/react'
 import {
   Select,
   SelectContent,
@@ -23,6 +24,9 @@ export default function GeneratePage() {
   const [assetCount, setAssetCount] = useState<number>(4)
   const { addProject } = useProjects()
   const router = useRouter()
+  const { status } = useSession()
+  const isAuthed = status === 'authenticated'
+  const isAuthLoading = status === 'loading'
 
   const handleFile = (selectedFile: File) => {
     if (!selectedFile.type.startsWith('image/')) {
@@ -62,6 +66,16 @@ export default function GeneratePage() {
   const handleGenerate = async () => {
     if (!file || !preview) return
 
+    if (!isAuthed) {
+      toast({
+        title: 'Login required',
+        description: 'You must log in to generate content.',
+        variant: 'destructive',
+      })
+      router.push(`/login?callbackUrl=${encodeURIComponent('/dashboard/generate')}`)
+      return
+    }
+
     setIsLoading(true)
     try {
       const project = await addProject({
@@ -77,6 +91,21 @@ export default function GeneratePage() {
       })
 
       router.push(`/dashboard/results/${project.id}`)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to generate. Please try again.'
+      const isAuth =
+        (e as any)?.status === 401 ||
+        /logged in|unauthorized/i.test(message)
+      toast({
+        title: isAuth ? 'Login required' : 'Generation failed',
+        description: isAuth
+          ? 'You must log in to generate content.'
+          : message,
+        variant: 'destructive',
+      })
+      if (isAuth) {
+        router.push(`/login?callbackUrl=${encodeURIComponent('/dashboard/generate')}`)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -99,6 +128,12 @@ export default function GeneratePage() {
               Drop your front or back design. We handle the rest — flat lays, angles, lifestyle shots,
               and motion content.
             </p>
+            {!isAuthLoading && !isAuthed && (
+              <div className="mt-4 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
+                <span className="font-medium">Login required to generate.</span>{' '}
+                You can browse the dashboard, but generation is locked until you sign in.
+              </div>
+            )}
 
             <div className="mt-6 flex items-center justify-between gap-4">
               <div className="text-xs text-muted-foreground tracking-widest uppercase">
@@ -185,7 +220,7 @@ export default function GeneratePage() {
               {preview && (
                 <Button
                   onClick={handleGenerate}
-                  disabled={isLoading}
+                  disabled={isLoading || isAuthLoading || !isAuthed}
                   className="w-full"
                 >
                   {isLoading ? 'Generating...' : 'Generate Content'}

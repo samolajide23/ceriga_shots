@@ -5,6 +5,34 @@ import { authOptions } from '@/lib/auth'
 import { deleteProjectForUser, getProjectForUser, updateProjectForUser } from '@/lib/projects'
 import type { Project } from '@/hooks/use-projects'
 import { isDatabaseConfigured } from '@/lib/db'
+import { z } from 'zod'
+
+const GeneratedImageSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.enum(['flat-lay', 'product-shot', 'lifestyle', 'detail']),
+    url: z.string().min(1),
+    timestamp: z.number(),
+  })
+  .strict()
+
+const GenerationStateSchema = z
+  .object({
+    status: z.enum(['idle', 'generating', 'complete', 'error']),
+    total: z.number(),
+    completed: z.number(),
+    nextType: z.enum(['flat-lay', 'product-shot', 'lifestyle', 'detail']).optional(),
+    errorMessage: z.string().optional(),
+  })
+  .strict()
+
+const ProjectPatchSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    generatedImages: z.array(GeneratedImageSchema).optional(),
+    generation: GenerationStateSchema.optional(),
+  })
+  .strict()
 
 export async function GET(_req: NextRequest): Promise<NextResponse> {
   const url = new URL(_req.url)
@@ -57,7 +85,12 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const updates = body as Partial<Project>
+  const parsed = ProjectPatchSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+
+  const updates: Partial<Project> = parsed.data
 
   try {
     const project = await updateProjectForUser(session.user.id, id, updates)

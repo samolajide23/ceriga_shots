@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 type MockupType = 'flat-lay' | 'product-shot' | 'lifestyle' | 'detail'
 type InteractionsImageMime =
@@ -246,6 +248,11 @@ function retryNote(lastErrorMessage: string) {
 export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const requestId =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`
   const startedAt = Date.now()
@@ -340,13 +347,13 @@ export async function POST(req: Request) {
     const variationDirective = buildVariationDirective(type, variationSeed, variationLevel)
 
     let lastErrorMessage = ''
-    console.log(
+    console.debug?.(
       `[mockups:${requestId}] start type=${type} attempts=${maxAttempts} inputMime=${inputMime} variationLevel=${variationLevel}`
     )
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const attemptStartedAt = Date.now()
-        console.log(`[mockups:${requestId}] attempt ${attempt}/${maxAttempts} generating...`)
+        console.debug?.(`[mockups:${requestId}] attempt ${attempt}/${maxAttempts} generating...`)
         const interaction = await ai.interactions.create({
           model: 'gemini-2.5-flash-image',
           input: [
@@ -366,7 +373,7 @@ export async function POST(req: Request) {
           ],
           response_modalities: ['image'],
         })
-        console.log(
+        console.debug?.(
           `[mockups:${requestId}] attempt ${attempt} response in ${Date.now() - attemptStartedAt}ms`
         )
 
@@ -375,7 +382,7 @@ export async function POST(req: Request) {
         const mime = outputImage?.mime_type || 'image/png'
 
         if (base64) {
-          console.log(
+          console.info?.(
             `[mockups:${requestId}] success type=${type} mime=${mime} totalMs=${Date.now() - startedAt}`
           )
           return NextResponse.json({
