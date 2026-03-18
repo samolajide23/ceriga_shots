@@ -1,8 +1,9 @@
 'use client'
 
-import { useSession, signIn, signOut } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import Link from 'next/link'
 
 export function AccountMenu() {
   const { data: session, status } = useSession()
@@ -13,13 +14,11 @@ export function AccountMenu() {
 
   if (!session?.user) {
     return (
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-      >
-        Sign in
-      </Button>
+      <Link href="/login">
+        <Button size="sm" variant="outline">
+          Sign in
+        </Button>
+      </Link>
     )
   }
 
@@ -48,13 +47,6 @@ export function AccountMenu() {
           )}
         </div>
       </div>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => signOut({ callbackUrl: '/' })}
-      >
-        Sign out
-      </Button>
     </div>
   )
 }

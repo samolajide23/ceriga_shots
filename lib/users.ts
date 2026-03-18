@@ -4,6 +4,7 @@ import { db, ensureSchema } from '@/lib/db'
 type DbUserRow = {
   id: string
   email: string
+  brand_name: string | null
   password_hash: string
   created_at: string
 }
@@ -19,7 +20,35 @@ export async function findUserByEmail(email: string): Promise<DbUserRow | null> 
   return rows[0] ?? null
 }
 
-export async function createUser(email: string, password: string): Promise<DbUserRow> {
+export async function findUserById(id: string): Promise<DbUserRow | null> {
+  await ensureSchema()
+  const rows = (await db`
+    select *
+    from users
+    where id = ${id}
+    limit 1
+  `) as DbUserRow[]
+  return rows[0] ?? null
+}
+
+export async function updateUserBrandName(id: string, brandName: string | null): Promise<DbUserRow | null> {
+  await ensureSchema()
+  const normalized =
+    typeof brandName === 'string' && brandName.trim() !== '' ? brandName.trim() : null
+  const rows = (await db`
+    update users
+    set brand_name = ${normalized}
+    where id = ${id}
+    returning *
+  `) as DbUserRow[]
+  return rows[0] ?? null
+}
+
+export async function createUser(
+  email: string,
+  password: string,
+  brandName?: string | null
+): Promise<DbUserRow> {
   await ensureSchema()
 
   const existing = await findUserByEmail(email)
@@ -28,9 +57,11 @@ export async function createUser(email: string, password: string): Promise<DbUse
   }
 
   const hash = await bcrypt.hash(password, 12)
+  const normalizedBrand =
+    typeof brandName === 'string' && brandName.trim() !== '' ? brandName.trim() : null
   const rows = (await db`
-    insert into users (email, password_hash)
-    values (${email}, ${hash})
+    insert into users (email, brand_name, password_hash)
+    values (${email}, ${normalizedBrand}, ${hash})
     returning *
   `) as DbUserRow[]
   return rows[0]

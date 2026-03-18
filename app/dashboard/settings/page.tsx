@@ -3,6 +3,12 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/hooks/use-toast'
+import { useSession, signOut } from 'next-auth/react'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
+import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, LogOut, Sparkles } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,25 +18,85 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 
+type StatusResponse = {
+  database: { configured: boolean }
+  gemini: { configured: boolean }
+  auth: { googleConfigured: boolean; secretConfigured: boolean }
+}
+
 export default function SettingsPage() {
+  const { data: session, status: sessionStatus } = useSession()
   const [formData, setFormData] = useState({
-    businessName: '',
-    email: '',
     category: 'apparel',
   })
   const [initialData, setInitialData] = useState(formData)
+  const [brandName, setBrandName] = useState<string>('')
+  const [initialBrandName, setInitialBrandName] = useState<string>('')
+  const [brandLoading, setBrandLoading] = useState(true)
+  const [brandSaving, setBrandSaving] = useState(false)
+  const [sysStatus, setSysStatus] = useState<StatusResponse | null>(null)
+  const [statusLoading, setStatusLoading] = useState(true)
 
   useEffect(() => {
     const next = {
-      businessName: window.localStorage.getItem('business_name') || '',
-      email: window.localStorage.getItem('email') || '',
       category: window.localStorage.getItem('category') || 'apparel',
     }
     setFormData(next)
     setInitialData(next)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setBrandLoading(true)
+    fetch('/api/me', { method: 'GET' })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`me ${res.status}`)
+        return (await res.json()) as { user: { brandName: string | null } }
+      })
+      .then((data) => {
+        if (cancelled) return
+        const next = data.user.brandName ?? ''
+        setBrandName(next)
+        setInitialBrandName(next)
+      })
+      .catch(() => {
+        if (cancelled) return
+      })
+      .finally(() => {
+        if (cancelled) return
+        setBrandLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setStatusLoading(true)
+    fetch('/api/status', { method: 'GET' })
+      .then(async (res) => {
+        if (res.status === 404) return null
+        if (!res.ok) throw new Error(`status ${res.status}`)
+        return (await res.json()) as StatusResponse
+      })
+      .then((data) => {
+        if (cancelled) return
+        setSysStatus(data)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setSysStatus(null)
+      })
+      .finally(() => {
+        if (cancelled) return
+        setStatusLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -38,54 +104,182 @@ export default function SettingsPage() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSave = () => {
-    window.localStorage.setItem('business_name', formData.businessName)
-    window.localStorage.setItem('email', formData.email)
+  const handleSave = async () => {
     window.localStorage.setItem('category', formData.category)
     setInitialData(formData)
-    toast({
-      title: 'Settings saved',
-    })
+
+    const trimmedBrand = brandName.trim()
+    if (trimmedBrand !== initialBrandName) {
+      setBrandSaving(true)
+      try {
+        const res = await fetch('/api/me', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brandName: trimmedBrand }),
+        })
+        const data = (await res.json()) as { user?: { brandName?: string | null }; error?: string }
+        if (!res.ok) throw new Error(data.error ?? `Failed to save brand name: ${res.status}`)
+        const next = data.user?.brandName ?? ''
+        setBrandName(next)
+        setInitialBrandName(next)
+      } catch (e) {
+        toast({
+          title: 'Failed to save brand name',
+          description: e instanceof Error ? e.message : 'Please try again.',
+          variant: 'destructive',
+        })
+      } finally {
+        setBrandSaving(false)
+      }
+    }
+
+    toast({ title: 'Settings saved' })
   }
 
-  return (
-    <div className="p-8 max-w-2xl">
-      <h1 className="text-3xl font-bold mb-8">Settings</h1>
+  const statusBadge = (ok: boolean, okLabel: string, badLabel: string) => (
+    <Badge variant={ok ? 'secondary' : 'destructive'} className="gap-1">
+      {ok ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+      {ok ? okLabel : badLabel}
+    </Badge>
+  )
 
-      <div className="space-y-6">
-        {/* Business Profile */}
-        <div className="border border-border rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Business Profile</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Business Name</label>
-              <input
+  return (
+    <div className="p-6 lg:p-8 max-w-4xl">
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Account, preferences, and system configuration.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>Account</CardTitle>
+            <CardDescription>Your signed-in identity and auth controls.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-sm font-medium">Signed in as</div>
+                {sessionStatus === 'loading' ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+                  </div>
+                ) : session?.user?.email ? (
+                  <div className="text-sm text-foreground truncate">{session.user.email}</div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">Not signed in</div>
+                )}
+              </div>
+
+              <Button
+                variant="outline"
+                className="shrink-0"
+                disabled={!session?.user}
+                onClick={() => signOut({ callbackUrl: '/' })}
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign out
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {sysStatus ? (
+          <Card>
+            <CardHeader className="border-b">
+              <CardTitle>System status</CardTitle>
+              <CardDescription>Admin-only configuration checks.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {statusLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Checking…
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium">Database</div>
+                      <div className="text-xs text-muted-foreground">Projects and users are stored in Neon.</div>
+                    </div>
+                    {statusBadge(sysStatus.database.configured, 'Connected', 'Missing DATABASE_URL')}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium">Gemini image generation</div>
+                      <div className="text-xs text-muted-foreground">
+                        If missing, we show placeholder tiles instead of failing.
+                      </div>
+                    </div>
+                    {statusBadge(sysStatus.gemini.configured, 'Enabled', 'Missing API key')}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium">Google sign-in</div>
+                      <div className="text-xs text-muted-foreground">Optional provider for NextAuth.</div>
+                    </div>
+                    {statusBadge(sysStatus.auth.googleConfigured, 'Configured', 'Not configured')}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium">Auth secret</div>
+                      <div className="text-xs text-muted-foreground">
+                        Recommended for stable sessions across restarts.
+                      </div>
+                    </div>
+                    {statusBadge(sysStatus.auth.secretConfigured, 'Set', 'Not set')}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="border-t justify-between">
+              <div className="text-xs text-muted-foreground">
+                Status checks never expose your secrets.
+              </div>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Refresh
+              </Button>
+            </CardFooter>
+          </Card>
+        ) : null}
+
+        <Card className="lg:col-span-2">
+          <CardHeader className="border-b">
+            <CardTitle>Preferences</CardTitle>
+            <CardDescription>
+              Brand name is saved to your account. Category is saved locally (per device).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Brand name</label>
+              <Input
                 type="text"
-                name="businessName"
-                value={formData.businessName}
-                onChange={handleChange}
+                value={brandName}
+                onChange={(e) => setBrandName(e.target.value)}
                 placeholder="Your brand name"
-                className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+                maxLength={80}
+                disabled={brandLoading || sessionStatus === 'loading' || !session?.user}
               />
+              <p className="text-xs text-muted-foreground">
+                {brandLoading ? 'Loading from your account…' : 'Saved to your account and shared across devices.'}
+              </p>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Email</label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="your@email.com"
-                className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Product Category</label>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Product category</label>
               <select
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
               >
                 <option value="apparel">Apparel & Streetwear</option>
                 <option value="accessories">Accessories</option>
@@ -93,55 +287,35 @@ export default function SettingsPage() {
                 <option value="sportswear">Sportswear</option>
                 <option value="luxury">Luxury Fashion</option>
               </select>
+              <p className="text-xs text-muted-foreground">
+                Will be used to tailor prompts and recommended shots.
+              </p>
             </div>
-          </div>
-        </div>
-
-        {/* Data Management */}
-        <div className="border border-border rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Data Management</h2>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              All your projects are stored locally on this device.
-            </p>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" className="text-destructive">
-                  Clear All Data
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Clear all local data?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will remove all projects and settings stored on this device. This cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={() => {
-                      window.localStorage.clear()
-                      toast({ title: 'Local data cleared' })
-                      window.location.reload()
-                    }}
-                  >
-                    Clear data
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </div>
-
-        {/* Save Button */}
-        <div className="flex gap-4">
-          <Button onClick={handleSave}>Save Changes</Button>
-          <Button variant="outline" onClick={() => setFormData(initialData)}>
-            Cancel
-          </Button>
-        </div>
+          </CardContent>
+          <CardFooter className="border-t justify-between gap-3 flex-col sm:flex-row sm:items-center">
+            <div className="flex gap-3">
+              <Button onClick={handleSave} disabled={brandSaving}>
+                {brandSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  'Save'
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setFormData(initialData)
+                  setBrandName(initialBrandName)
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </CardFooter>
+        </Card>
       </div>
     </div>
   )

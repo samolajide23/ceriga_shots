@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createUser } from '@/lib/users'
 
 export async function POST(req: Request) {
-  let body: { email?: string; password?: string }
+  let body: { email?: string; password?: string; brandName?: string }
   try {
     body = await req.json()
   } catch {
@@ -11,6 +11,7 @@ export async function POST(req: Request) {
 
   const email = body.email?.trim().toLowerCase()
   const password = body.password ?? ''
+  const brandName = typeof body.brandName === 'string' ? body.brandName : undefined
 
   if (!email || !password || password.length < 8) {
     return NextResponse.json(
@@ -19,8 +20,15 @@ export async function POST(req: Request) {
     )
   }
 
+  if (brandName && brandName.trim().length > 80) {
+    return NextResponse.json(
+      { error: 'Brand name must be 80 characters or less.' },
+      { status: 400 }
+    )
+  }
+
   try {
-    await createUser(email, password)
+    await createUser(email, password, brandName)
     return NextResponse.json({ ok: true })
   } catch (error) {
     if (error instanceof Error && /exists/i.test(error.message)) {

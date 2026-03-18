@@ -9,6 +9,7 @@ import Link from 'next/link'
 
 export default function SignupPage() {
   const router = useRouter()
+  const [brandName, setBrandName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -22,7 +23,7 @@ export default function SignupPage() {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ brandName, email, password }),
     })
 
     const data = await res.json()
@@ -60,6 +61,21 @@ export default function SignupPage() {
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">Brand name (optional)</label>
+            <Input
+              type="text"
+              autoComplete="organization"
+              value={brandName}
+              onChange={(e) => setBrandName(e.target.value)}
+              placeholder="e.g. Ceriga"
+              maxLength={80}
+            />
+            <p className="text-xs text-muted-foreground">
+              This helps personalize your workspace. You can change it later.
+            </p>
+          </div>
+
           <div className="space-y-2">
             <label className="block text-sm font-medium">Email</label>
             <Input

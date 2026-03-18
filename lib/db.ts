@@ -21,10 +21,14 @@ export async function ensureSchema() {
     create table if not exists users (
       id uuid primary key default gen_random_uuid(),
       email text not null unique,
+      brand_name text,
       password_hash text not null,
       created_at timestamptz not null default now()
     )
   `
+
+  // Backfill/migrate older schemas.
+  await db`alter table users add column if not exists brand_name text`
 
   await db`
     create table if not exists projects (
